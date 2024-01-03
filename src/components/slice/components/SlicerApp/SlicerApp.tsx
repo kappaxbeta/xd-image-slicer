@@ -5,6 +5,8 @@ import {Button} from "@/components/ui/button";
 import {nanoid} from "nanoid";
 import Konva from "konva";
 import {SlicerIcons} from "@/components/icons/SlicerIcons.tsx";
+import {onMoveEnd, onMoveStart,  onScroll} from "./canvasEvent.ts";
+
 
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -32,7 +34,7 @@ export default function SlicerApp({ image, width, height, reset}: SlicerAppProps
   const [active, setActive] = useState<string | null>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
   const stageRef= useRef<Konva.Stage | null>(null);
-
+  const [zoom, setZoom] = useState(1.0)
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   //@ts-ignore
   useEffect(() => {
@@ -64,26 +66,29 @@ export default function SlicerApp({ image, width, height, reset}: SlicerAppProps
     transformerRef.current?.getLayer()?.batchDraw();
   }, [active]);
 
+
   return <div className={"flex w-full py-3 flex-col "}>
-    <div className={" grid grid-cols-5 gap-5 w-full py-3"}>
-      <Button variant={"outline"}  className={"rounded"} onClick={() => {
+    <div className={" grid grid-cols-3 md:grid-cols-5 gap-5 w-full py-3 "}>
+      <Button variant={"outline"} className={"rounded"} onClick={() => {
         const id = nanoid()
         setCrops((crops) => {
           return [...crops, {x: 0, y: 0, width: 100, height: 100, id, scaleX: 0, scaleY: 0}]
-        } )
+        })
 
       }}>
         <SlicerIcons.Crop></SlicerIcons.Crop> <span className={"px-1"}>Add Crop</span>
       </Button>
-      <Button  variant={"outline"} className={"rounded"} onClick={() => {
-        if(!active) return;
-        const conf = crops.find(i => {return i.id === active});
+      <Button variant={"outline"} className={"rounded"} onClick={() => {
+        if (!active) return;
+        const conf = crops.find(i => {
+          return i.id === active
+        });
         const imageSrc = new Image()
         imageSrc.onload = () => {
-          if(!conf) return
+          if (!conf) return
           const newImage = new Konva.Image({
             image: imageSrc,
-            width:  conf?.width * conf?.scaleX,
+            width: conf?.width * conf?.scaleX,
             height: conf?.height * conf?.scaleY,
             crop: {
               x: conf.x,
@@ -101,58 +106,95 @@ export default function SlicerApp({ image, width, height, reset}: SlicerAppProps
         }
         imageSrc.src = image
 
-      }} >
-      <SlicerIcons.Download></SlicerIcons.Download> <span className={"px-1"}>Download</span>
+      }}>
+        <SlicerIcons.Download></SlicerIcons.Download> <span className={"px-1"}>Download</span>
       </Button>
+      <div className={"flex align-middle"}>
+        <Button variant={"destructive"} className={"w-1/3"} disabled={zoom < 0.02} onClick={() => {
+          setZoom(zoom => zoom - 0.05)
+          stageRef.current?.scale({x: zoom, y: zoom})
+        }}>
+          <SlicerIcons.ZoomOut className="md:flex sm:hidden"></SlicerIcons.ZoomOut> <span className={"md:sr-only"}>-</span>
+        </Button>
+        <code className={"w-1/3 flex items-center justify-center "}>
+          {Math.ceil(zoom * 100)}%
+        </code>
+        <Button className={"w-1/3"} variant={"destructive"} disabled={zoom > 2.99} onClick={() => {
+          setZoom(zoom => zoom + 0.05)
+          stageRef.current?.scale({x: zoom, y: zoom})
+        }}>
+          <SlicerIcons.ZoomIn className="md:flex sm:hidden"></SlicerIcons.ZoomIn> <span className={"md:sr-only"}>+</span>
+        </Button>
+      </div>
       <Button variant={"destructive"} onClick={() => reset()}>
-        <SlicerIcons.Delete></SlicerIcons.Delete> <span className={"px-1"}>Delete</span>
+        <SlicerIcons.Delete className="h-4 w-4 fill-current"></SlicerIcons.Delete> <span className={"px-1"}>Delete</span>
       </Button>
 
     </div>
-
-    {loadSize ?
-        <Stage width={width} height={height} ref={(ref)  => {stageRef.current = ref}}>
+    {/* @ts-ignore */}
+    {loadSize ? <Stage onTouchStart={() => {}} onTouchMove={(evt) => {
+      // @ts-ignore
+      onMoveStart(evt, setZoom)
+    }}
+                       className={"border border-accent"}
+                       onTouchEnd={onMoveEnd}
+                       onWheel={(evt ) => {
+                         onScroll(evt, setZoom)
+                       }}
+                       draggable={true}
+                       width={width}
+                       height={height}
+                       onTransform={(transform) => {
+                         console.log(transform)
+                       }}
+                       ref={(ref) => {
+                         stageRef.current = ref
+                       }}>
       <Layer draggable={true}>
-        <ImageLayer id="mainImage" draggable={false}  x={0} y={0} width={sizes.width} height={sizes.height} onClick={() => {
-          setActive(null)
-        }} src={image}  />
+        <ImageLayer id="mainImage" draggable={false} x={0} y={0} width={sizes.width} height={sizes.height}
+                        onClick={() => {
+                          setActive(null)
+                        }} src={image}/>
 
 
-        {crops && crops.map((crop) => {
-          return <Rect key={crop.id + "-rect"} id={crop.id } y={crop.y} x={crop.x} height={crop.height} width={crop.width} stroke={"blue"} draggable={true} onClick={ () => {
-            setActive(crop.id)
-          }}></Rect>
-        })}
+            {crops && crops.map((crop) => {
+              return <Rect key={crop.id + "-rect"} id={crop.id} y={crop.y} x={crop.x} height={crop.height}
+                           width={crop.width} stroke={"blue"} draggable={true} onClick={() => {
+                setActive(crop.id)
+              }} onPointerClick={() => {
+                setActive(crop.id)
+              }}></Rect>
+            })}
 
-        <Transformer onTransformEnd={(e) => {
-          console.log(e)
+            <Transformer onTransformEnd={(e) => {
+              console.log(e)
 
-          if(stageRef.current) {
-            console.log("will load image")
-            const Image = stageRef.current.findOne("#mainImage")
-            const attr = e.target.attrs
-            console.log(Image)
-            setCrops(c => {
-              return c.map(crop => {
-                if(active === crop.id) {
-                  return {
-                    ...crop,
-                    x: attr.x,
-                    y: attr.y,
-                    scaleX: attr.scaleX,
-                    scaleY: attr.scaleY
-                  }
-                }
-                return crop
-              })
-            })
-          }
+              if (stageRef.current) {
 
-        }}  ref={transformerRef} rotateEnabled={false}></Transformer>
+                const Image = stageRef.current.findOne("#mainImage")
+                const attr = e.target.attrs
+                console.log(Image)
+                setCrops(c => {
+                  return c.map(crop => {
+                    if (active === crop.id) {
+                      return {
+                        ...crop,
+                        x: attr.x,
+                        y: attr.y,
+                        scaleX: attr.scaleX,
+                        scaleY: attr.scaleY
+                      }
+                    }
+                    return crop
+                  })
+                })
+              }
 
-      </Layer>
+            }} ref={transformerRef} rotateEnabled={false}></Transformer>
 
-    </Stage> : "Load Size" }
+          </Layer>
+
+        </Stage> : "Load Size" }
 
     </div>;
 }

@@ -2,11 +2,15 @@
 import {
     Download,
     Crop,
-    Delete
+    Delete,
+    ZoomIn,
+    ZoomOut
 } from "lucide-react"
 
 export const SlicerIcons = {
     Download,
     Crop,
-    Delete
+    Delete,
+    ZoomIn,
+    ZoomOut
 }

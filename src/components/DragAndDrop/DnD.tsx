@@ -17,7 +17,11 @@ const DnD : FC<{children : ReactElement, onImageLoad?: (image: string) => void, 
 
         }
     }, [])
-    const {getRootProps, getInputProps} = useDropzone({onDrop})
+    const {getRootProps, getInputProps} = useDropzone({onDrop, multiple: false, accept: {
+            'image/png': ['.png'],
+            'image/jpeg': ['.jpg', '.jpeg'],
+            'image/webp':['.webp']
+        }})
 
 
     return <div  {...getRootProps() }   className={"relative h-full w-full"}>
